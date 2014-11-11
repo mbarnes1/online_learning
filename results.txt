@@ -1,0 +1,15 @@
+*** Online Results *** 
+Net accuracy: 0.960833648772
+Facade: 0.888273238505
+Veg: 0.882600336458
+Pole: 0.594121763471
+Wire: 0.482885085575
+Ground: 0.997215645985
+
+*** Held-out Results *** 
+Net accuracy: 0.504244855345
+Facade: 0.908762228839
+Veg: 0.0
+Pole: 0.0
+Wire: 0.0
+Ground: 0.999645012425
