@@ -4,11 +4,12 @@ import numpy as np
 from itertools import izip
 import random
 
+
 def main():
     """
     Opens data log and runs online logistic regression
     """
-    log_reg = OnlineLogisticRegression(alpha=0.1, number_classes=5, number_features=10)
+    log_reg = OnlineLogisticRegression(alpha=.01, number_classes=5, number_features=10)
     ins = open('data/oakland_part3_am_rf.node_features')
     results = open('results.txt', 'w')
     next(ins)  # first header line
@@ -22,13 +23,16 @@ def main():
         labels_true.append(map_label(int(data[4])))
         features.append(np.array(data[5:]))
     dual_shuffle(features, labels_true)
-    for counter, (feature, label) in enumerate(izip(features, labels_true)):
+    features_resampled = features
+    labels_resampled = labels_true
+    #features_resampled, labels_resampled = resample(200000, features, labels_true)
+    for counter, (feature, label) in enumerate(izip(features_resampled, labels_resampled)):
         print 'Training sample:', counter
         log_reg.update(feature, label)
-    correct = sum(np.array(labels_true) == np.array(log_reg.predictions))
-    accuracy = float(correct)/len(labels_true)
-    results.write('*** Online Results *** \nNet accuracy: ' + str(correct) + '/' + str(len(labels_true)) + ' = ' + str(accuracy) + '\n')
-    class_accuracies = class_accuracy(labels_true, log_reg.predictions)
+    correct = sum(np.array(labels_resampled) == np.array(log_reg.predictions))
+    accuracy = float(correct)/len(labels_resampled)
+    results.write('*** Online Results *** \nNet accuracy: ' + str(correct) + '/' + str(len(labels_resampled)) + ' = ' + str(accuracy) + '\n')
+    class_accuracies = class_accuracy(labels_resampled, log_reg.predictions)
     name_accuracies = {map_name(label): acc for label, acc in class_accuracies.iteritems()}
     for name, (correct, occurences, accuracy) in name_accuracies.iteritems():
         results.write(name + ': ' + str(correct) + '/' + str(occurences) + ' = ' + str(accuracy) + '\n')
@@ -52,6 +56,34 @@ def main():
     name_accuracies = {map_name(label): acc for label, acc in class_accuracies.iteritems()}
     for name, (correct, occurences, accuracy) in name_accuracies.iteritems():
         results.write(name + ': ' + str(correct) + '/' + str(occurences) + ' = ' + str(accuracy) + '\n')
+
+
+def resample(n_samples, features, labels):
+    """
+    Shuffles and balances the classes
+    :param features: List of features
+    :param labels: List of labels
+    :param balancing: Whether to balance classes
+    :return:
+    """
+    all_labels = set()
+    for label in labels:
+        all_labels.add(label)
+    probabilities = np.zeros(len(labels))
+    labels_vector = np.array(labels)
+    for label in all_labels:
+        label_indices = labels_vector == label
+        probabilities += label_indices*sum(label_indices)
+    probabilities = 1/probabilities
+    probabilities = probabilities/sum(probabilities)
+    indices = range(0, len(labels))
+    resampled = np.random.choice(indices, size=n_samples, replace=True, p=probabilities)
+    new_features = list()
+    new_labels = list()
+    for idx in resampled:
+        new_features.append(features[idx])
+        new_labels.append(labels[idx])
+    return new_features, new_labels
 
 
 def dual_shuffle(list_a, list_b):

@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
-from main import class_accuracy, dual_shuffle
+from main import class_accuracy, dual_shuffle, resample
 from copy import deepcopy
+from itertools import izip
 __author__ = 'mbarnes1'
 
 
@@ -14,10 +15,10 @@ class MyTestCase(unittest.TestCase):
         labels_pred = np.array([0, 0, 1, 0, 3, 3, 3, 1, 3, 2])
         accuracies = class_accuracy(labels_true, labels_pred)
         correct = {
-            0: 1.0,
-            1: 0.5,
-            2: 0.0,
-            3: 0.5,
+            0: (2, 2, 1.0),
+            1: (1, 2, 0.5),
+            2: (0, 2, 0.0),
+            3: (2, 4, 0.5),
         }
         self.assertEqual(accuracies, correct)
 
@@ -36,6 +37,12 @@ class MyTestCase(unittest.TestCase):
         a_sorted = list(np.array(a)[indices])
         self.assertEqual(a_sorted, a_copy)
 
+    def test_resample(self):
+        features = [0, 0, 0, 1, 1, 1, 1, 1, 1, 2]
+        labels = [0, 0, 0, 1, 1, 1, 1, 1, 1, 2]
+        new_features, new_labels = resample(20, features, labels)
+        for feature, label in izip(new_features, new_labels):
+            self.assertEqual(feature, label)
 
 if __name__ == '__main__':
     unittest.main()
