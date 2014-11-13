@@ -9,7 +9,7 @@ def main():
     """
     Opens data log and runs online logistic regression
     """
-    log_reg = OnlineLogisticRegression(alpha=.01, number_classes=5, number_features=10)
+    log_reg = OnlineLogisticRegression(alpha=.001, number_classes=5, number_features=10)
     ins = open('data/oakland_part3_am_rf.node_features')
     results = open('results.txt', 'w')
     next(ins)  # first header line
@@ -22,17 +22,16 @@ def main():
         data = [float(x) for x in line.split()]
         labels_true.append(map_label(int(data[4])))
         features.append(np.array(data[5:]))
-    dual_shuffle(features, labels_true)
-    features_resampled = features
-    labels_resampled = labels_true
-    #features_resampled, labels_resampled = resample(200000, features, labels_true)
-    for counter, (feature, label) in enumerate(izip(features_resampled, labels_resampled)):
+    features = normalize(features)
+    shuffle(features, labels_true)
+    #features_resampled, labels_resampled, xyz = resample(100000, features, labels_true, xyz)
+    for counter, (feature, label) in enumerate(izip(features, labels_true)):
         print 'Training sample:', counter
         log_reg.update(feature, label)
-    correct = sum(np.array(labels_resampled) == np.array(log_reg.predictions))
-    accuracy = float(correct)/len(labels_resampled)
-    results.write('*** Online Results *** \nNet accuracy: ' + str(correct) + '/' + str(len(labels_resampled)) + ' = ' + str(accuracy) + '\n')
-    class_accuracies = class_accuracy(labels_resampled, log_reg.predictions)
+    correct = sum(np.array(labels_true) == np.array(log_reg.predictions))
+    accuracy = float(correct)/len(labels_true)
+    results.write('*** Online Results *** \nNet accuracy: ' + str(correct) + '/' + str(len(labels_true)) + ' = ' + str(accuracy) + '\n')
+    class_accuracies = class_accuracy(labels_true, log_reg.predictions)
     name_accuracies = {map_name(label): acc for label, acc in class_accuracies.iteritems()}
     for name, (correct, occurences, accuracy) in name_accuracies.iteritems():
         results.write(name + ': ' + str(correct) + '/' + str(occurences) + ' = ' + str(accuracy) + '\n')
@@ -42,13 +41,20 @@ def main():
     next(ins)  # first header line
     heldout_true = list()
     heldout_predicted = list()
+    xyz = list()
+    features = list()
     for counter, line in enumerate(ins):
-        print 'Testing sample:', counter
+        print 'Loading test sample:', counter
         data = [float(x) for x in line.split()]
+        xyz.append(data[0:3])
         label = map_label(int(data[4]))
-        features = np.array(data[5:])
-        heldout_predicted.append(log_reg.predict(features))
+        features.append(np.array(data[5:]))
         heldout_true.append(label)
+    features = normalize(features)
+    for counter, feature in enumerate(features):
+        print 'Evaluating test sample:', counter
+        heldout_predicted.append(log_reg.predict(feature))
+    xyz = np.array(xyz)
     correct = sum(np.array(heldout_true) == np.array(heldout_predicted))
     accuracy = float(correct)/len(heldout_true)
     results.write('\n*** Held-out Results *** \nNet accuracy: ' + str(correct) + '/' + str(len(heldout_true)) + ' = ' + str(accuracy) + '\n')
@@ -56,14 +62,31 @@ def main():
     name_accuracies = {map_name(label): acc for label, acc in class_accuracies.iteritems()}
     for name, (correct, occurences, accuracy) in name_accuracies.iteritems():
         results.write(name + ': ' + str(correct) + '/' + str(occurences) + ' = ' + str(accuracy) + '\n')
+    np.savetxt('xyz.csv', xyz, delimiter=',')
+    labels_unmapped = [unmap_label(x) for x in heldout_predicted]
+    np.savetxt("labels.csv", labels_unmapped, delimiter=",")
 
 
-def resample(n_samples, features, labels):
+def normalize(features):
+    """
+    Normalizes features. Zero mean and divide by standard deviation
+    :param features: List of features
+    :return:
+    """
+    features_array = np.array(features)
+    mean = np.mean(features_array, axis=0)
+    features_array = features_array-mean
+    stddev = np.std(features_array, axis=0)
+    features_array = features_array/stddev
+    return list(np.nan_to_num(features_array))
+
+
+def resample(n_samples, features, labels, xyz):
     """
     Shuffles and balances the classes
     :param features: List of features
     :param labels: List of labels
-    :param balancing: Whether to balance classes
+    :param xyz: List of xyz coordinates
     :return:
     """
     all_labels = set()
@@ -80,13 +103,15 @@ def resample(n_samples, features, labels):
     resampled = np.random.choice(indices, size=n_samples, replace=True, p=probabilities)
     new_features = list()
     new_labels = list()
+    new_xyz = list()
     for idx in resampled:
         new_features.append(features[idx])
         new_labels.append(labels[idx])
-    return new_features, new_labels
+        new_xyz.append(xyz[idx])
+    return new_features, new_labels, xyz
 
 
-def dual_shuffle(list_a, list_b):
+def shuffle(list_a, list_b):
     """
     Shuffles two lists in place such that order is maintained
     :param list_a:
@@ -116,6 +141,22 @@ def class_accuracy(labels_true, labels_predicted):
         correct = sum(labels_predicted[true_indices] == cls)
         accuracies[cls] = (correct, occurences, float(correct)/occurences)
     return accuracies
+
+
+def unmap_label(label):
+    """
+    Maps zero indexed labels to original values
+    :param label: The mapped label
+    :return mapped: The original label
+    """
+    label_dict = {
+        0: 1004,  # veg
+        1: 1100,  # wire
+        2: 1103,  # pole
+        3: 1200,  # ground
+        4: 1400,  # facade
+    }
+    return label_dict[label]
 
 
 def map_label(label):
